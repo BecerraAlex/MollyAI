@@ -1,297 +1,339 @@
 package com.example.mollyai
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.launch
+import com.example.mollyai.ui.theme.MollyAITheme
 
-@OptIn(ExperimentalMaterial3Api::class)  // Suppressing Experimental API warning
+// Task state enum to track task progress
+enum class TaskState {
+    DEFAULT, STARTED, COMPLETED
+}
+
+// Data class for Task (Mission) using mutable states
+data class Task(
+    var description: MutableState<String> = mutableStateOf(""),
+    var time: MutableState<String> = mutableStateOf("0000"),
+    var state: MutableState<TaskState> = mutableStateOf(TaskState.DEFAULT) // Track task state (not started, started, completed)
+)
+
 class MainActivity : ComponentActivity() {
-    private var isOnHomeScreen = true // Variable to track if the user is on the home screen
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Use OnBackPressedDispatcher to handle back press
-        val callback = object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (!isOnHomeScreen) {
-                    finish() // Handle back press logic
-                }
-            }
-        }
-
-        onBackPressedDispatcher.addCallback(this, callback)
-
         setContent {
-            MollyAIMainScreen()
+            MollyAIApp()
         }
     }
 
-    override fun onUserLeaveHint() {
-        // Override the home button behavior
-        moveTaskToBack(true) // Keeps MollyAI as the launcher when the home button is pressed
-    }
-}
+    @Composable
+    fun MollyAIApp() {
+        MollyAITheme {
+            var editTask by remember { mutableStateOf<Task?>(null) } // Track task being edited
 
-@OptIn(ExperimentalMaterial3Api::class) // Opting into Experimental Material3 API
-@Composable
-fun MollyAIMainScreen() {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+            // Disable back button on home screen
+            BackHandler(enabled = true) { /* Do nothing to disable back button */ }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = { // Drawer content here
-            DrawerContent(onCloseDrawer = { scope.launch { drawerState.close() } })
-        },
-        gesturesEnabled = false // Disable gestures to prevent opening drawer by swiping
-    ) {
-        // Main content with TopAppBar
-        Scaffold(
-            containerColor = Color.Transparent, // Ensure the Scaffold has a transparent background
-            topBar = {
-                TopAppBar(
-                    title = { Text("MollyAI", color = Color.White) },
-                    navigationIcon = { // Add the navigation icon to the left side
-                        IconButton(onClick = {
-                            scope.launch { drawerState.open() } // Open drawer on hamburger press
-                        }) {
-                            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = Color.White)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent // Make the TopAppBar fully transparent
-                    )
-                )
-            },
-            content = { padding ->
-                MollyAIHomePage(padding)
-            }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DrawerContent(onCloseDrawer: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.LightGray)
-            .padding(16.dp)
-    ) {
-        IconButton(onClick = { onCloseDrawer() }) { // Hamburger icon inside the drawer to close it
-            Icon(Icons.Filled.Menu, contentDescription = "Close Drawer")
-        }
-        Text(
-            "Settings",
-            modifier = Modifier
-                .padding(16.dp)
-                .clickable { onCloseDrawer() } // Close drawer when an item is clicked
-        )
-    }
-}
-
-data class Task(
-    var name: String
-)
-
-@Composable
-fun TaskRow(
-    task: Task,
-    onLongPress: (Task) -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .clickable { onLongPress(task) } // Ensure long press is handled properly
-    ) {
-        Text(
-            text = task.name,
-            style = MaterialTheme.typography.bodyMedium.copy(color = Color.White)
-        )
-    }
-}
-
-@Composable
-fun TaskListScreen(tasks: MutableList<Task>) {
-    var showDialog by remember { mutableStateOf(false) }
-    var currentTask by remember { mutableStateOf(Task("")) }
-    var isAddingTask by remember { mutableStateOf(false) }
-
-    if (showDialog) {
-        TaskInputDialog(
-            task = currentTask,
-            isAddingTask = isAddingTask,
-            onDismiss = { showDialog = false },
-            onSave = { updatedTask ->
-                if (isAddingTask) {
-                    tasks.add(updatedTask)
-                }
-                showDialog = false
-            }
-        )
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent) // Transparent so background image is visible
-    ) {
-        LazyColumn(
-            modifier = Modifier.weight(1f)
-        ) {
-            items(tasks) { task ->
-                TaskRow(
-                    task = task,
-                    onLongPress = { selectedTask ->
-                        currentTask = selectedTask
-                        showDialog = true
-                        isAddingTask = false
+            Scaffold(
+                topBar = {
+                    // MollyAI header
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .height(50.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "MollyAI",
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                )
-                HorizontalDivider(
-                    color = Color(0xFF6200EA),
-                    thickness = 1.dp
-                )
-            }
-        }
+                },
+                content = { padding ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        MissionScreen(
+                            onEditTask = { task ->
+                                editTask = task
+                            }
+                        )
+                    }
 
-        // Button to Add New Task
-        Button(
-            onClick = {
-                currentTask = Task("")
-                isAddingTask = true
-                showDialog = true
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF6200EA)
+                    // Show edit dialog if a task is selected
+                    editTask?.let { task ->
+                        EditTaskDialog(
+                            task = task,
+                            onSave = { updatedTask ->
+                                task.description.value = updatedTask.description.value
+                                task.time.value = updatedTask.time.value
+                                editTask = null
+                            },
+                            onCancel = { editTask = null }
+                        )
+                    }
+                }
             )
-        ) {
-            Text(text = "Add Task", color = Color.White)
         }
     }
-}
 
-@Composable
-fun TaskInputDialog(
-    task: Task,
-    isAddingTask: Boolean,
-    onDismiss: () -> Unit,
-    onSave: (Task) -> Unit
-) {
-    var taskName by remember { mutableStateOf(TextFieldValue(task.name)) }
+    // Composable function for displaying the mission lists (Daily and Side Missions)
+    @Composable
+    fun MissionScreen(onEditTask: (Task) -> Unit) {
+        // Get the context for Toast messages
+        val context = LocalContext.current
 
-    Dialog(onDismissRequest = { onDismiss() }) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp), // Use RoundedCornerShape from the correct import
-            color = Color.White
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
+        // Your daily routine (missions) integrated
+        val dailyTasksState = remember {
+            mutableStateListOf(
+                Task(mutableStateOf("Wake up, Train"), mutableStateOf("0300")),
+                Task(mutableStateOf("Hygiene, Get dressed, Pray"), mutableStateOf("0400")),
+                Task(mutableStateOf("Journal, Morning Market Analysis"), mutableStateOf("0500")),
+                Task(mutableStateOf("Leave for work"), mutableStateOf("0600")),
+                Task(mutableStateOf("Start work"), mutableStateOf("0700")),
+                Task(mutableStateOf("Lunch (Read, Backtest, Code)"), mutableStateOf("1100")),
+                Task(mutableStateOf("Back to work"), mutableStateOf("1130")),
+                Task(mutableStateOf("Off work, Drive home"), mutableStateOf("1530")),
+                Task(mutableStateOf("Backtest/Complete side missions"), mutableStateOf("1600")),
+                Task(mutableStateOf("Dinner + Family time"), mutableStateOf("1700")),
+                Task(mutableStateOf("Train (Weights/Boxing)"), mutableStateOf("1800")),
+                Task(mutableStateOf("Shower, Get ready for next day"), mutableStateOf("1930")),
+                Task(mutableStateOf("End of day review"), mutableStateOf("2000")),
+                Task(mutableStateOf("Spend time with wife"), mutableStateOf("2030")),
+                Task(mutableStateOf("Visualization, Manifestation, Sleep"), mutableStateOf("2100"))
+            )
+        }
+
+        // Empty side mission list for now
+        val sideMissionsState = remember { mutableStateListOf<Task>() }
+
+        Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            // Daily Missions Section
+            Text(
+                text = "Daily Missions",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(8.dp)
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.75f) // 75% height for Daily Missions
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = if (isAddingTask) "Add Task" else "Edit Task")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = taskName,
-                    onValueChange = { taskName = it },
-                    label = { Text("Task Name") }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
+                items(dailyTasksState) { task ->
+                    // Task item with double tap functionality to toggle between states
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                BorderStroke(2.dp, getBorderColor(task.state.value)) // Border color based on task state
+                            )
+                            .padding(8.dp)
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onDoubleTap = {
+                                        toggleTaskState(task, context) // Change task state and show toast on double tap
+                                    },
+                                    onLongPress = {
+                                        onEditTask(task) // Open edit menu on long press (0.25s)
+                                    }
+                                )
+                            }
+                    ) {
+                        Row( // Using Row to put time and description on the same line
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Time on the left
+                            Text(
+                                text = task.time.value,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Gray
+                            )
+                            // Description on the right
+                            Text(
+                                text = task.description.value,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
-                    TextButton(onClick = {
-                        task.name = taskName.text
-                        onSave(task)
-                    }) {
-                        Text("Save")
+                }
+            }
+
+            // Side Missions Section (empty initially)
+            Text(
+                text = "Side Missions",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(8.dp)
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.25f) // 25% height for Side Missions
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(sideMissionsState) { task ->
+                    // Display for side missions (empty at first)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(BorderStroke(1.dp, Color.Gray)) // Shared border for time and description
+                            .padding(8.dp)
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onLongPress = {
+                                        onEditTask(task) // Open edit menu on long press (0.25s)
+                                    }
+                                )
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Time on the left
+                            Text(
+                                text = task.time.value,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Gray
+                            )
+                            // Description on the right
+                            Text(
+                                text = task.description.value,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
     }
-}
 
-@Composable
-fun MollyAIHomePage(padding: PaddingValues) {
-    val tasks = remember { mutableStateListOf<Task>() }
-
-    Box(modifier = Modifier
-        .padding(padding)
-        .background(Color.Transparent) // Ensuring transparent background
-    ) {
-        TaskListScreen(tasks = tasks)
+    // Helper function to toggle task state on double-tap and show Toast message
+    private fun toggleTaskState(task: Task, context: android.content.Context) {
+        task.state.value = when (task.state.value) {
+            TaskState.DEFAULT -> {
+                showToast(context, "Task Started")
+                TaskState.STARTED // From default to started (red)
+            }
+            TaskState.STARTED -> {
+                showToast(context, "Task Completed")
+                TaskState.COMPLETED // From started to completed (green)
+            }
+            TaskState.COMPLETED -> {
+                showToast(context, "Task Reset")
+                TaskState.DEFAULT // Reset to default (no color)
+            }
+        }
     }
-}
 
-@Preview(showBackground = true)
-@Composable
-fun PreviewMollyAIHomePage() {
-    MollyAIHomePage(PaddingValues())
+    // Helper function to show Toast message
+    private fun showToast(context: android.content.Context, message: String) {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    // Helper function to get border color based on task state
+    private fun getBorderColor(state: TaskState): Color {
+        return when (state) {
+            TaskState.DEFAULT -> Color.Gray
+            TaskState.STARTED -> Color.Red
+            TaskState.COMPLETED -> Color.Green
+        }
+    }
+
+    // Composable function for editing a task (description and time)
+    @Composable
+    fun EditTaskDialog(
+        task: Task,
+        onSave: (Task) -> Unit,
+        onCancel: () -> Unit
+    ) {
+        var description by remember { mutableStateOf(task.description.value) }
+        var time by remember { mutableStateOf(task.time.value) }
+
+        Dialog(onDismissRequest = { onCancel() }) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = Color.White
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "Edit Mission", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Time input
+                    OutlinedTextField(
+                        value = time,
+                        onValueChange = { time = it },
+                        label = { Text("Time") }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Description input
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description") }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Action buttons (Save, Cancel)
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Button(onClick = {
+                            task.description.value = description
+                            task.time.value = time
+                            onSave(task)
+                        }) {
+                            Text("Save")
+                        }
+                        Button(onClick = { onCancel() }) {
+                            Text("Cancel")
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
