@@ -49,6 +49,25 @@ class MainActivity : ComponentActivity() {
     fun MollyAIApp() {
         MollyAITheme {
             var editTask by remember { mutableStateOf<Task?>(null) } // Track task being edited
+            val dailyTasksState = remember {
+                mutableStateListOf(
+                    Task(mutableStateOf("Wake up, Train"), mutableStateOf("0300")),
+                    Task(mutableStateOf("Hygiene, Get dressed, Pray"), mutableStateOf("0400")),
+                    Task(mutableStateOf("Journal, Morning Market Analysis"), mutableStateOf("0500")),
+                    Task(mutableStateOf("Leave for work"), mutableStateOf("0600")),
+                    Task(mutableStateOf("Start work"), mutableStateOf("0700")),
+                    Task(mutableStateOf("Lunch (Read, Backtest, Code)"), mutableStateOf("1100")),
+                    Task(mutableStateOf("Back to work"), mutableStateOf("1130")),
+                    Task(mutableStateOf("Off work, Drive home"), mutableStateOf("1530")),
+                    Task(mutableStateOf("Backtest/Complete side missions"), mutableStateOf("1600")),
+                    Task(mutableStateOf("Dinner + Family time"), mutableStateOf("1700")),
+                    Task(mutableStateOf("Train (Weights/Boxing)"), mutableStateOf("1800")),
+                    Task(mutableStateOf("Shower, Get ready for next day"), mutableStateOf("1930")),
+                    Task(mutableStateOf("End of day review"), mutableStateOf("2000")),
+                    Task(mutableStateOf("Spend time with wife"), mutableStateOf("2030")),
+                    Task(mutableStateOf("Visualization, Manifestation, Sleep"), mutableStateOf("2100"))
+                )
+            }
 
             // Disable back button on home screen
             BackHandler(enabled = true) { /* Do nothing to disable back button */ }
@@ -65,7 +84,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "MollyAI",
-                            color = Color.White,
+                            color = Color.White, // Changed to white
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -79,9 +98,8 @@ class MainActivity : ComponentActivity() {
                         contentAlignment = Alignment.Center
                     ) {
                         MissionScreen(
-                            onEditTask = { task ->
-                                editTask = task
-                            }
+                            dailyTasksState = dailyTasksState,
+                            onEditTask = { task -> editTask = task }
                         )
                     }
 
@@ -94,7 +112,11 @@ class MainActivity : ComponentActivity() {
                                 task.time.value = updatedTask.time.value
                                 editTask = null
                             },
-                            onCancel = { editTask = null }
+                            onCancel = { editTask = null },
+                            onDelete = {
+                                dailyTasksState.remove(task) // Remove task from list
+                                editTask = null
+                            }
                         )
                     }
                 }
@@ -104,33 +126,9 @@ class MainActivity : ComponentActivity() {
 
     // Composable function for displaying the mission lists (Daily and Side Missions)
     @Composable
-    fun MissionScreen(onEditTask: (Task) -> Unit) {
+    fun MissionScreen(dailyTasksState: MutableList<Task>, onEditTask: (Task) -> Unit) {
         // Get the context for Toast messages
         val context = LocalContext.current
-
-        // Your daily routine (missions) integrated
-        val dailyTasksState = remember {
-            mutableStateListOf(
-                Task(mutableStateOf("Wake up, Train"), mutableStateOf("0300")),
-                Task(mutableStateOf("Hygiene, Get dressed, Pray"), mutableStateOf("0400")),
-                Task(mutableStateOf("Journal, Morning Market Analysis"), mutableStateOf("0500")),
-                Task(mutableStateOf("Leave for work"), mutableStateOf("0600")),
-                Task(mutableStateOf("Start work"), mutableStateOf("0700")),
-                Task(mutableStateOf("Lunch (Read, Backtest, Code)"), mutableStateOf("1100")),
-                Task(mutableStateOf("Back to work"), mutableStateOf("1130")),
-                Task(mutableStateOf("Off work, Drive home"), mutableStateOf("1530")),
-                Task(mutableStateOf("Backtest/Complete side missions"), mutableStateOf("1600")),
-                Task(mutableStateOf("Dinner + Family time"), mutableStateOf("1700")),
-                Task(mutableStateOf("Train (Weights/Boxing)"), mutableStateOf("1800")),
-                Task(mutableStateOf("Shower, Get ready for next day"), mutableStateOf("1930")),
-                Task(mutableStateOf("End of day review"), mutableStateOf("2000")),
-                Task(mutableStateOf("Spend time with wife"), mutableStateOf("2030")),
-                Task(mutableStateOf("Visualization, Manifestation, Sleep"), mutableStateOf("2100"))
-            )
-        }
-
-        // Empty side mission list for now
-        val sideMissionsState = remember { mutableStateListOf<Task>() }
 
         Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
             // Daily Missions Section
@@ -138,6 +136,7 @@ class MainActivity : ComponentActivity() {
                 text = "Daily Missions",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
+                color = Color.White, // Changed to white
                 modifier = Modifier.padding(8.dp)
             )
             LazyColumn(
@@ -176,64 +175,14 @@ class MainActivity : ComponentActivity() {
                                 text = task.time.value,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.Gray
+                                color = Color.White
                             )
                             // Description on the right
                             Text(
                                 text = task.description.value,
                                 fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Side Missions Section (empty initially)
-            Text(
-                text = "Side Missions",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(8.dp)
-            )
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.25f) // 25% height for Side Missions
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(sideMissionsState) { task ->
-                    // Display for side missions (empty at first)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(BorderStroke(1.dp, Color.Gray)) // Shared border for time and description
-                            .padding(8.dp)
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onLongPress = {
-                                        onEditTask(task) // Open edit menu on long press (0.25s)
-                                    }
-                                )
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Time on the left
-                            Text(
-                                text = task.time.value,
-                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.Gray
-                            )
-                            // Description on the right
-                            Text(
-                                text = task.description.value,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
+                                color = Color.White // Changed to white
                             )
                         }
                     }
@@ -279,7 +228,8 @@ class MainActivity : ComponentActivity() {
     fun EditTaskDialog(
         task: Task,
         onSave: (Task) -> Unit,
-        onCancel: () -> Unit
+        onCancel: () -> Unit,
+        onDelete: () -> Unit // Added delete functionality
     ) {
         var description by remember { mutableStateOf(task.description.value) }
         var time by remember { mutableStateOf(task.time.value) }
@@ -288,13 +238,13 @@ class MainActivity : ComponentActivity() {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
-                color = Color.White
+                color = Color.Black, // Changed to black
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Edit Mission", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text(text = "Edit Mission", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.White) // Changed to black
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -302,7 +252,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = time,
                         onValueChange = { time = it },
-                        label = { Text("Time") }
+                        label = { Text("Time", color = Color.White) } // Changed to black
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -311,12 +261,12 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Description") }
+                        label = { Text("Description", color = Color.White) } // Changed to black
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Action buttons (Save, Cancel)
+                    // Action buttons (Save, Cancel, Delete)
                     Row(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         modifier = Modifier.fillMaxWidth()
@@ -330,6 +280,9 @@ class MainActivity : ComponentActivity() {
                         }
                         Button(onClick = { onCancel() }) {
                             Text("Cancel")
+                        }
+                        Button(onClick = { onDelete() }) { // Delete button
+                            Text("Delete")
                         }
                     }
                 }
