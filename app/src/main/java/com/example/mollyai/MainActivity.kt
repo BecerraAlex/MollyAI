@@ -195,15 +195,15 @@ class MainActivity : ComponentActivity() {
     private fun toggleTaskState(task: Task, context: android.content.Context) {
         task.state.value = when (task.state.value) {
             TaskState.DEFAULT -> {
-                showToast(context, "Task Started")
+                showToast(context, "Mission Started")
                 TaskState.STARTED // From default to started (red)
             }
             TaskState.STARTED -> {
-                showToast(context, "Task Completed")
+                showToast(context, "Mission Completed")
                 TaskState.COMPLETED // From started to completed (green)
             }
             TaskState.COMPLETED -> {
-                showToast(context, "Task Reset")
+                showToast(context, "Mission Reset")
                 TaskState.DEFAULT // Reset to default (no color)
             }
         }
@@ -261,7 +261,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Description", color = Color.White) } // Changed to black
+                        label = { Text("Mission", color = Color.White) } // Changed to black
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
