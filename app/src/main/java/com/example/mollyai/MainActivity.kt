@@ -33,6 +33,7 @@ enum class TaskState {
 data class Task(
     var description: MutableState<String> = mutableStateOf(""),
     var time: MutableState<String> = mutableStateOf("0000"),
+    var descriptionDetails: MutableState<String> = mutableStateOf(""), // New description details field
     var state: MutableState<TaskState> = mutableStateOf(TaskState.DEFAULT) // Track task state (not started, started, completed)
 )
 
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
     fun MollyAIApp() {
         MollyAITheme {
             var editTask by remember { mutableStateOf<Task?>(null) } // Track task being edited
+            var showDetails by remember { mutableStateOf<String?>(null) } // Track if we should show mission details
             val dailyTasksState = remember {
                 mutableStateListOf(
                     Task(mutableStateOf("Wake up, Train"), mutableStateOf("0300")),
@@ -99,8 +101,14 @@ class MainActivity : ComponentActivity() {
                     ) {
                         MissionScreen(
                             dailyTasksState = dailyTasksState,
-                            onEditTask = { task -> editTask = task }
+                            onEditTask = { task -> editTask = task },
+                            onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
                         )
+
+                        // Display mission details if available
+                        showDetails?.let {
+                            MissionDetailsDialog(description = it, onDismiss = { showDetails = null })
+                        }
                     }
 
                     // Show edit dialog if a task is selected
@@ -110,6 +118,7 @@ class MainActivity : ComponentActivity() {
                             onSave = { updatedTask ->
                                 task.description.value = updatedTask.description.value
                                 task.time.value = updatedTask.time.value
+                                task.descriptionDetails.value = updatedTask.descriptionDetails.value
                                 editTask = null
                             },
                             onCancel = { editTask = null },
@@ -126,7 +135,7 @@ class MainActivity : ComponentActivity() {
 
     // Composable function for displaying the mission lists (Daily and Side Missions)
     @Composable
-    fun MissionScreen(dailyTasksState: MutableList<Task>, onEditTask: (Task) -> Unit) {
+    fun MissionScreen(dailyTasksState: MutableList<Task>, onEditTask: (Task) -> Unit, onSingleTapTask: (Task) -> Unit) {
         // Get the context for Toast messages
         val context = LocalContext.current
 
@@ -162,6 +171,9 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onLongPress = {
                                         onEditTask(task) // Open edit menu on long press (0.25s)
+                                    },
+                                    onTap = {
+                                        onSingleTapTask(task) // Show mission details on single tap
                                     }
                                 )
                             }
@@ -223,7 +235,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Composable function for editing a task (description and time)
+    // Composable function for editing a task (description, time, and description details)
     @Composable
     fun EditTaskDialog(
         task: Task,
@@ -233,6 +245,7 @@ class MainActivity : ComponentActivity() {
     ) {
         var description by remember { mutableStateOf(task.description.value) }
         var time by remember { mutableStateOf(task.time.value) }
+        var descriptionDetails by remember { mutableStateOf(task.descriptionDetails.value) } // New field for mission details
 
         Dialog(onDismissRequest = { onCancel() }) {
             Surface(
@@ -244,7 +257,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "Edit Mission", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.White) // Changed to black
+                    Text(text = "Edit Mission", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.White)
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -252,7 +265,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = time,
                         onValueChange = { time = it },
-                        label = { Text("Time", color = Color.White) } // Changed to black
+                        label = { Text("Time", color = Color.White) }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -261,7 +274,16 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Mission", color = Color.White) } // Changed to black
+                        label = { Text("Mission", color = Color.White) }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Mission Details input
+                    OutlinedTextField(
+                        value = descriptionDetails,
+                        onValueChange = { descriptionDetails = it },
+                        label = { Text("Details", color = Color.White) } // New input for details
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -274,6 +296,7 @@ class MainActivity : ComponentActivity() {
                         Button(onClick = {
                             task.description.value = description
                             task.time.value = time
+                            task.descriptionDetails.value = descriptionDetails
                             onSave(task)
                         }) {
                             Text("Save")
@@ -284,6 +307,28 @@ class MainActivity : ComponentActivity() {
                         Button(onClick = { onDelete() }) { // Delete button
                             Text("Delete")
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // Composable function to show mission details in a dialog
+    @Composable
+    fun MissionDetailsDialog(description: String, onDismiss: () -> Unit) {
+        Dialog(onDismissRequest = { onDismiss() }) {
+            Surface(
+                modifier = Modifier.padding(16.dp),
+                color = Color.Transparent,
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(text = "Mission Details", fontWeight = FontWeight.Bold, fontSize = 30.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(text = description)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { onDismiss() }) {
+                        Text("Close")
                     }
                 }
             }
