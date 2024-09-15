@@ -251,7 +251,7 @@ class MainActivity : ComponentActivity() {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
-                color = Color.Black, // Changed to black
+                color = Color.Black.copy(alpha = 0.6f), // 50% opacity for transparency
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -319,7 +319,7 @@ class MainActivity : ComponentActivity() {
         Dialog(onDismissRequest = { onDismiss() }) {
             Surface(
                 modifier = Modifier.padding(16.dp),
-                color = Color.Transparent,
+                color = Color.Black.copy(alpha = 0.5f), // 50% opacity for transparency
                 shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -333,5 +333,4 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
+    }}
