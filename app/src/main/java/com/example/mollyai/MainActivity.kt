@@ -6,18 +6,33 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.* // Correct import for layout components
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +66,8 @@ class MainActivity : ComponentActivity() {
         MollyAITheme {
             var editTask by remember { mutableStateOf<Task?>(null) } // Track task being edited
             var showDetails by remember { mutableStateOf<String?>(null) } // Track if we should show mission details
+
+            // State for daily tasks and side tasks
             val dailyTasksState = remember {
                 mutableStateListOf(
                     Task(mutableStateOf("Wake up, Train"), mutableStateOf("0300")),
@@ -71,39 +88,70 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
+            val sideTasksState = remember {
+                mutableStateListOf(
+                    Task(mutableStateOf("Organize Documents"), mutableStateOf("Anytime")),
+                    Task(mutableStateOf("Plan Weekly Goals"), mutableStateOf("Anytime")),
+                    Task(mutableStateOf("Learn New Technique"), mutableStateOf("Anytime")),
+                    Task(mutableStateOf("Backup Files"), mutableStateOf("Anytime"))
+                )
+            }
+
             // Disable back button on home screen
             BackHandler(enabled = true) { /* Do nothing to disable back button */ }
 
             Scaffold(
                 topBar = {
-                    // MollyAI header
+                    // MollyAI header with 50% opacity (transparent background)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
-                            .height(50.dp),
+                            .padding(0.dp)
+                            .height(0.dp)
+                            .background(Color.Black.copy(alpha = 1.0f)), // Transparent background added
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "MollyAI",
-                            color = Color.White, // Changed to white
+                            color = Color.White,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 },
-                content = { padding ->
+                content = { innerPadding -> // Use innerPadding instead of `_`
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(padding),
-                        contentAlignment = Alignment.Center
+                            .padding(innerPadding) // Use the padding parameter here
                     ) {
-                        MissionScreen(
-                            dailyTasksState = dailyTasksState,
-                            onEditTask = { task -> editTask = task },
-                            onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
+                        // Set the background image using Image composable
+                        Image(
+                            painter = painterResource(id = R.drawable.dmt), // Ensure correct image file in res/drawable folder
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.FillHeight // Scale the image to fill the screen
                         )
+
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            MissionScreen(
+                                title = "Daily Missions",
+                                taskState = dailyTasksState,
+                                modifier = Modifier.weight(0.70f), // Set weight for daily missions
+                                onEditTask = { task -> editTask = task },
+                                onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
+                            )
+
+                            Spacer(modifier = Modifier.height(0.dp))
+
+                            MissionScreen(
+                                title = "Side Missions",
+                                taskState = sideTasksState,
+                                modifier = Modifier.weight(0.30f), // Set weight for side missions
+                                onEditTask = { task -> editTask = task },
+                                onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
+                            )
+                        }
 
                         // Display mission details if available
                         showDetails?.let {
@@ -135,27 +183,31 @@ class MainActivity : ComponentActivity() {
 
     // Composable function for displaying the mission lists (Daily and Side Missions)
     @Composable
-    fun MissionScreen(dailyTasksState: MutableList<Task>, onEditTask: (Task) -> Unit, onSingleTapTask: (Task) -> Unit) {
+    fun MissionScreen(
+        title: String,
+        taskState: MutableList<Task>,
+        modifier: Modifier = Modifier,
+        onEditTask: (Task) -> Unit,
+        onSingleTapTask: (Task) -> Unit
+    ) {
         // Get the context for Toast messages
         val context = LocalContext.current
 
-        Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-            // Daily Missions Section
+        Column(modifier = modifier.padding(8.dp)) {
             Text(
-                text = "Daily Missions",
+                text = title,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White, // Changed to white
+                color = Color.White,
                 modifier = Modifier.padding(8.dp)
             )
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.75f) // 75% height for Daily Missions
                     .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                items(dailyTasksState) { task ->
+                items(taskState) { task ->
                     // Task item with double tap functionality to toggle between states
                     Box(
                         modifier = Modifier
@@ -163,6 +215,7 @@ class MainActivity : ComponentActivity() {
                             .border(
                                 BorderStroke(2.dp, getBorderColor(task.state.value)) // Border color based on task state
                             )
+                            .background(Color.Black.copy(alpha = 0.3f)) // 50% opacity background inside the box
                             .padding(8.dp)
                             .pointerInput(Unit) {
                                 detectTapGestures(
@@ -178,7 +231,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                     ) {
-                        Row( // Using Row to put time and description on the same line
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -194,7 +247,7 @@ class MainActivity : ComponentActivity() {
                                 text = task.description.value,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White // Changed to white
+                                color = Color.White
                             )
                         }
                     }
@@ -229,9 +282,9 @@ class MainActivity : ComponentActivity() {
     // Helper function to get border color based on task state
     private fun getBorderColor(state: TaskState): Color {
         return when (state) {
-            TaskState.DEFAULT -> Color.Gray
-            TaskState.STARTED -> Color.Red
-            TaskState.COMPLETED -> Color.Green
+            TaskState.DEFAULT -> Color.Gray.copy(alpha = 1.0f) // 50% opacity for transparency
+            TaskState.STARTED -> Color.Red.copy(alpha = 1.0f) // 50% opacity for transparency
+            TaskState.COMPLETED -> Color.Green.copy(alpha = 1.0f) // 50% opacity for transparency
         }
     }
 
@@ -283,7 +336,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = descriptionDetails,
                         onValueChange = { descriptionDetails = it },
-                        label = { Text("Details", color = Color.White) } // New input for details
+                        label = { Text("Details", color = Color.White) }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -333,4 +386,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }}
+    }
+}
