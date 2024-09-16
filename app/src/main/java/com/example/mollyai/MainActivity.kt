@@ -1,5 +1,9 @@
 package com.example.mollyai
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -13,19 +17,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.* // Correct import for layout components
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.mollyai.ui.theme.MollyAITheme
+import kotlin.random.Random
 
 // Task state enum to track task progress
 enum class TaskState {
@@ -52,9 +51,43 @@ data class Task(
     var state: MutableState<TaskState> = mutableStateOf(TaskState.DEFAULT) // Track task state (not started, started, completed)
 )
 
+@Suppress("RemoveRedundantQualifierName")
 class MainActivity : ComponentActivity() {
+
+    // List of drawable image IDs
+    private val imageResources = listOf(
+        R.drawable.dmt,
+        R.drawable.dmt2,
+        R.drawable.dmt3,
+        R.drawable.dmt4,
+        R.drawable.dmt5,
+        R.drawable.dmt6,
+        R.drawable.dmt7,
+        R.drawable.dmt8,
+        R.drawable.dmt5,
+        R.drawable.background2,
+        R.drawable.techbackground,
+        R.drawable.techbackground2,
+        R.drawable.techbackground3
+    )
+
+    // Variable to store the selected background image
+    private var selectedImageResource by mutableIntStateOf(R.drawable.background2)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Register a receiver for the screen off event
+        val screenOffReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                // When the screen turns off, select a random image
+                if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                    val randomIndex = Random.nextInt(imageResources.size)
+                    selectedImageResource = imageResources[randomIndex]
+                }
+            }
+        }
+        registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
 
         setContent {
             MollyAIApp()
@@ -91,97 +124,103 @@ class MainActivity : ComponentActivity() {
             val sideTasksState = remember {
                 mutableStateListOf(
                     Task(mutableStateOf("Organize Documents"), mutableStateOf("Anytime")),
-                    Task(mutableStateOf("Plan Weekly Goals"), mutableStateOf("Anytime")),
-                    Task(mutableStateOf("Learn New Technique"), mutableStateOf("Anytime")),
-                    Task(mutableStateOf("Backup Files"), mutableStateOf("Anytime"))
                 )
             }
 
             // Disable back button on home screen
             BackHandler(enabled = true) { /* Do nothing to disable back button */ }
 
-            Scaffold(
-                topBar = {
-                    // MollyAI header with 50% opacity (transparent background)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(0.dp)
-                            .height(0.dp)
-                            .background(Color.Black.copy(alpha = 1.0f)), // Transparent background added
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "MollyAI",
-                            color = Color.White,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                },
-                content = { innerPadding -> // Use innerPadding instead of `_`
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding) // Use the padding parameter here
-                    ) {
-                        // Set the background image using Image composable
-                        Image(
-                            painter = painterResource(id = R.drawable.dmt), // Ensure correct image file in res/drawable folder
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.FillHeight // Scale the image to fill the screen
-                        )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                // Background Image
+                Image(
+                    painter = painterResource(id = selectedImageResource),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillHeight // Scale the image to fill the screen
+                )
 
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            MissionScreen(
-                                title = "Daily Missions",
-                                taskState = dailyTasksState,
-                                modifier = Modifier.weight(0.70f), // Set weight for daily missions
-                                onEditTask = { task -> editTask = task },
-                                onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
-                            )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(0.dp), // Add padding
+                    horizontalAlignment = Alignment.Start, // Align content to the start (left)
+                    verticalArrangement = Arrangement.Top // Arrange items from the top
+                ) {
+                    // Mission Screen Section
+                    MissionScreen(
+                        title = "Missions",
+                        taskState = dailyTasksState,
+                        modifier = Modifier.weight(0.70f), // Set weight for daily missions
+                        onEditTask = { task -> editTask = task },
+                        onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
+                    )
 
-                            Spacer(modifier = Modifier.height(0.dp))
+                    Spacer(modifier = Modifier.height(10.dp)) // Added spacer between sections
 
-                            MissionScreen(
-                                title = "Side Missions",
-                                taskState = sideTasksState,
-                                modifier = Modifier.weight(0.30f), // Set weight for side missions
-                                onEditTask = { task -> editTask = task },
-                                onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
-                            )
-                        }
-
-                        // Display mission details if available
-                        showDetails?.let {
-                            MissionDetailsDialog(description = it, onDismiss = { showDetails = null })
-                        }
-                    }
-
-                    // Show edit dialog if a task is selected
-                    editTask?.let { task ->
-                        EditTaskDialog(
-                            task = task,
-                            onSave = { updatedTask ->
-                                task.description.value = updatedTask.description.value
-                                task.time.value = updatedTask.time.value
-                                task.descriptionDetails.value = updatedTask.descriptionDetails.value
-                                editTask = null
-                            },
-                            onCancel = { editTask = null },
-                            onDelete = {
-                                dailyTasksState.remove(task) // Remove task from list
-                                editTask = null
-                            }
-                        )
-                    }
+                    MissionScreen(
+                        title = "Side Missions",
+                        taskState = sideTasksState,
+                        modifier = Modifier.weight(0.30f), // Set weight for side missions
+                        onEditTask = { task -> editTask = task },
+                        onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
+                    )
                 }
-            )
+
+                // MollyAI Footer aligned to the bottom-right corner
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd) // Aligns the Box to the bottom-right corner
+                        .padding(0.dp) // Optional padding from the edges
+                        .border(
+                            BorderStroke(0.dp, Color.LightGray.copy(alpha = 0f)), // Optional: Border for MollyAI header
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .background(Color.Transparent, shape = RoundedCornerShape(8.dp)) // Fully transparent background
+                        .padding(0.dp), // Padding inside the box
+                    contentAlignment = Alignment.BottomEnd // Align the text within the box
+                ) {
+                    Text(
+                        text = "MollyAI",
+                        color = Color.White,
+                        fontSize = 14.sp, // Adjust size as needed
+                        fontWeight = FontWeight.Thin,
+                    )
+                }
+
+                // Display mission details if available
+                showDetails?.let {
+                    MissionDetailsDialog(description = it, onDismiss = { showDetails = null })
+                }
+
+                // Show edit dialog if a task is selected
+                editTask?.let { task ->
+                    EditTaskDialog(
+                        task = task,
+                        onSave = { updatedTask ->
+                            task.description.value = updatedTask.description.value
+                            task.time.value = updatedTask.time.value
+                            task.descriptionDetails.value = updatedTask.descriptionDetails.value
+                            editTask = null
+                        },
+                        onCancel = { editTask = null },
+                        onDelete = {
+                            // Remove the task from either dailyTasksState or sideTasksState
+                            if (dailyTasksState.contains(task)) {
+                                dailyTasksState.remove(task)
+                            } else if (sideTasksState.contains(task)) {
+                                sideTasksState.remove(task)
+                            }
+                            editTask = null
+                        }
+                    )
+                }
+            }
         }
     }
 
-    // Composable function for displaying the mission lists (Daily and Side Missions)
     @Composable
     fun MissionScreen(
         title: String,
@@ -193,7 +232,11 @@ class MainActivity : ComponentActivity() {
         // Get the context for Toast messages
         val context = LocalContext.current
 
-        Column(modifier = modifier.padding(8.dp)) {
+        Column(
+            modifier = modifier
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally // Center the title
+        ) {
             Text(
                 text = title,
                 fontSize = 24.sp,
@@ -213,9 +256,10 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(
-                                BorderStroke(2.dp, getBorderColor(task.state.value)) // Border color based on task state
+                                BorderStroke(1.8.dp, getBorderColor(task.state.value)), // Border color based on task state
+                                shape = RoundedCornerShape(8.dp) // Apply rounded corners here
                             )
-                            .background(Color.Black.copy(alpha = 0.3f)) // 50% opacity background inside the box
+                            .background(Color.Black.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp)) // 50% opacity background inside the box with rounded corners
                             .padding(8.dp)
                             .pointerInput(Unit) {
                                 detectTapGestures(
@@ -282,13 +326,12 @@ class MainActivity : ComponentActivity() {
     // Helper function to get border color based on task state
     private fun getBorderColor(state: TaskState): Color {
         return when (state) {
-            TaskState.DEFAULT -> Color.Gray.copy(alpha = 1.0f) // 50% opacity for transparency
+            TaskState.DEFAULT -> Color.LightGray.copy(alpha = 0.6f) // 50% opacity for transparency
             TaskState.STARTED -> Color.Red.copy(alpha = 1.0f) // 50% opacity for transparency
             TaskState.COMPLETED -> Color.Green.copy(alpha = 1.0f) // 50% opacity for transparency
         }
     }
 
-    // Composable function for editing a task (description, time, and description details)
     @Composable
     fun EditTaskDialog(
         task: Task,
@@ -357,7 +400,9 @@ class MainActivity : ComponentActivity() {
                         Button(onClick = { onCancel() }) {
                             Text("Cancel")
                         }
-                        Button(onClick = { onDelete() }) { // Delete button
+                        Button(onClick = {
+                            onDelete() // Handle deletion here
+                        }) {
                             Text("Delete")
                         }
                     }
