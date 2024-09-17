@@ -5,6 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.Gravity
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -36,11 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.mollyai.ui.theme.MollyAITheme
+import java.text.SimpleDateFormat
+import java.util.* // Import calendar and other time utilities
 import kotlin.random.Random
 
 // Task state enum to track task progress
 enum class TaskState {
-    DEFAULT, STARTED, COMPLETED
+    DEFAULT, STARTED, COMPLETED, LATE
 }
 
 // Data class for Task (Mission) using mutable states
@@ -48,7 +55,7 @@ data class Task(
     var description: MutableState<String> = mutableStateOf(""),
     var time: MutableState<String> = mutableStateOf("0000"),
     var descriptionDetails: MutableState<String> = mutableStateOf(""), // New description details field
-    var state: MutableState<TaskState> = mutableStateOf(TaskState.DEFAULT) // Track task state (not started, started, completed)
+    var state: MutableState<TaskState> = mutableStateOf(TaskState.DEFAULT) // Track task state (not started, started, completed, late)
 )
 
 @Suppress("RemoveRedundantQualifierName")
@@ -56,23 +63,11 @@ class MainActivity : ComponentActivity() {
 
     // List of drawable image IDs
     private val imageResources = listOf(
-        R.drawable.dmt,
-        R.drawable.dmt2,
-        R.drawable.dmt3,
-        R.drawable.dmt4,
-        R.drawable.dmt5,
-        R.drawable.dmt6,
-        R.drawable.dmt7,
-        R.drawable.dmt8,
-        R.drawable.dmt5,
-        R.drawable.background2,
-        R.drawable.techbackground,
-        R.drawable.techbackground2,
-        R.drawable.techbackground3
+        R.drawable.matrix2,
     )
 
     // Variable to store the selected background image
-    private var selectedImageResource by mutableIntStateOf(R.drawable.background2)
+    private var selectedImageResource by mutableIntStateOf(R.drawable.matrix2)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,7 +112,7 @@ class MainActivity : ComponentActivity() {
                     Task(mutableStateOf("Shower, Get ready for next day"), mutableStateOf("1930")),
                     Task(mutableStateOf("End of day review"), mutableStateOf("2000")),
                     Task(mutableStateOf("Spend time with wife"), mutableStateOf("2030")),
-                    Task(mutableStateOf("Visualization, Manifestation, Sleep"), mutableStateOf("2100"))
+                    Task(mutableStateOf("Sleep"), mutableStateOf("2100"))
                 )
             }
 
@@ -129,6 +124,19 @@ class MainActivity : ComponentActivity() {
 
             // Disable back button on home screen
             BackHandler(enabled = true) { /* Do nothing to disable back button */ }
+
+            // Check time every minute to update tasks
+            LaunchedEffect(Unit) {
+                val handler = Handler(Looper.getMainLooper())
+                val taskChecker = object : Runnable {
+                    override fun run() {
+                        checkTaskStart(dailyTasksState)
+                        resetTasksAtMidnight(dailyTasksState)
+                        handler.postDelayed(this, 60000) // Repeat every 60 seconds
+                    }
+                }
+                handler.post(taskChecker)
+            }
 
             Box(
                 modifier = Modifier
@@ -155,7 +163,10 @@ class MainActivity : ComponentActivity() {
                         taskState = dailyTasksState,
                         modifier = Modifier.weight(0.70f), // Set weight for daily missions
                         onEditTask = { task -> editTask = task },
-                        onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
+                        onSingleTapTask = { task -> showDetails = task.descriptionDetails.value },
+                        onAddNewTask = {
+                            dailyTasksState.add(Task(mutableStateOf("New Mission"), mutableStateOf("0000")))
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(10.dp)) // Added spacer between sections
@@ -165,7 +176,10 @@ class MainActivity : ComponentActivity() {
                         taskState = sideTasksState,
                         modifier = Modifier.weight(0.30f), // Set weight for side missions
                         onEditTask = { task -> editTask = task },
-                        onSingleTapTask = { task -> showDetails = task.descriptionDetails.value }
+                        onSingleTapTask = { task -> showDetails = task.descriptionDetails.value },
+                        onAddNewTask = {
+                            sideTasksState.add(Task(mutableStateOf("New Side Mission"), mutableStateOf("Anytime")))
+                        }
                     )
                 }
 
@@ -175,10 +189,16 @@ class MainActivity : ComponentActivity() {
                         .align(Alignment.BottomEnd) // Aligns the Box to the bottom-right corner
                         .padding(0.dp) // Optional padding from the edges
                         .border(
-                            BorderStroke(0.dp, Color.LightGray.copy(alpha = 0f)), // Optional: Border for MollyAI header
+                            BorderStroke(
+                                0.dp,
+                                Color.LightGray.copy(alpha = 0f)
+                            ), // Optional: Border for MollyAI header
                             shape = RoundedCornerShape(8.dp)
                         )
-                        .background(Color.Transparent, shape = RoundedCornerShape(8.dp)) // Fully transparent background
+                        .background(
+                            Color.Transparent,
+                            shape = RoundedCornerShape(8.dp)
+                        ) // Fully transparent background
                         .padding(0.dp), // Padding inside the box
                     contentAlignment = Alignment.BottomEnd // Align the text within the box
                 ) {
@@ -221,20 +241,56 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Function to check if tasks should be started based on the current time
+    private fun checkTaskStart(tasks: MutableList<Task>) {
+        val currentTime = SimpleDateFormat("HHmm", Locale.getDefault()).format(Date())
+
+        tasks.forEachIndexed { index, task ->
+            val nextTask = tasks.getOrNull(index + 1)
+            if (currentTime >= task.time.value && task.state.value == TaskState.DEFAULT) {
+                task.state.value = TaskState.STARTED // Change task to started if the time matches
+            }
+            // If the task has started but not completed by the time the next task starts
+            if (nextTask != null && currentTime >= nextTask.time.value && task.state.value == TaskState.STARTED) {
+                task.state.value = TaskState.LATE // Mark the task as incomplete
+            }
+        }
+    }
+
+    // Function to reset all tasks at midnight
+    private fun resetTasksAtMidnight(tasks: MutableList<Task>) {
+        val currentTime = SimpleDateFormat("HHmm", Locale.getDefault()).format(Date())
+        if (currentTime == "0000") {
+            tasks.forEach { task ->
+                task.state.value = TaskState.DEFAULT // Reset all tasks to default at midnight
+            }
+        }
+    }
+
     @Composable
     fun MissionScreen(
         title: String,
         taskState: MutableList<Task>,
         modifier: Modifier = Modifier,
         onEditTask: (Task) -> Unit,
-        onSingleTapTask: (Task) -> Unit
+        onSingleTapTask: (Task) -> Unit,
+        onAddNewTask: () -> Unit // New callback for adding a new task
     ) {
         // Get the context for Toast messages
         val context = LocalContext.current
 
         Column(
             modifier = modifier
-                .padding(8.dp),
+                .padding(8.dp)
+                // Long press detection to create a new task
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onLongPress = {
+                            onAddNewTask()
+                            showToast(context, "New Mission Created")
+                        }
+                    )
+                },
             horizontalAlignment = Alignment.CenterHorizontally // Center the title
         ) {
             Text(
@@ -244,6 +300,7 @@ class MainActivity : ComponentActivity() {
                 color = Color.White,
                 modifier = Modifier.padding(8.dp)
             )
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -268,9 +325,6 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onLongPress = {
                                         onEditTask(task) // Open edit menu on long press (0.25s)
-                                    },
-                                    onTap = {
-                                        onSingleTapTask(task) // Show mission details on single tap
                                     }
                                 )
                             }
@@ -284,7 +338,14 @@ class MainActivity : ComponentActivity() {
                                 text = task.time.value,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color.White,
+                                modifier = Modifier.pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = {
+                                            onSingleTapTask(task) // Show mission details on single tap of time value
+                                        }
+                                    )
+                                }
                             )
                             // Description on the right
                             Text(
@@ -302,33 +363,51 @@ class MainActivity : ComponentActivity() {
 
     // Helper function to toggle task state on double-tap and show Toast message
     private fun toggleTaskState(task: Task, context: android.content.Context) {
-        task.state.value = when (task.state.value) {
-            TaskState.DEFAULT -> {
-                showToast(context, "Mission Started")
-                TaskState.STARTED // From default to started (red)
-            }
-            TaskState.STARTED -> {
-                showToast(context, "Mission Completed")
-                TaskState.COMPLETED // From started to completed (green)
-            }
-            TaskState.COMPLETED -> {
-                showToast(context, "Mission Reset")
-                TaskState.DEFAULT // Reset to default (no color)
+        // If the task is already completed, prevent any further manual changes
+        if (task.state.value == TaskState.COMPLETED) {
+            showToast(context, "Mission Completed. Alhamdulillah")
+            return // Do nothing if the task is completed
+        }
+
+        if (task.time.value == "Anytime") {
+            task.state.value = TaskState.COMPLETED
+            showToast(context, "Mission Completed. Alhamdulillah")
+        } else {
+            if (task.state.value == TaskState.STARTED || task.state.value == TaskState.LATE) {
+                task.state.value = TaskState.COMPLETED
+                showToast(context, "Mission Completed. Alhamdulillah")
+            } else {
+                showToast(context, "Too Soon")
             }
         }
     }
 
-    // Helper function to show Toast message
-    private fun showToast(context: android.content.Context, message: String) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    // Helper function to show Toast message at the center with 50% opacity
+    private fun showToast(context: Context, message: String) {
+        val toast = Toast.makeText(context, message, Toast.LENGTH_SHORT)
+        val view: View? = toast.view
+
+        view?.apply {
+            setBackgroundColor(android.graphics.Color.BLACK) // Change background to black
+            alpha = 0.1f // Set background opacity to 50%
+        }
+
+        // Set Toast's text color
+        toast.view?.findViewById<TextView>(android.R.id.message)?.apply {
+            setTextColor(android.graphics.Color.WHITE) // Set the text color to white
+        }
+
+        toast.setGravity(Gravity.CENTER, 0, 0) // Center the toast message on the screen
+        toast.show()
     }
 
     // Helper function to get border color based on task state
     private fun getBorderColor(state: TaskState): Color {
         return when (state) {
-            TaskState.DEFAULT -> Color.LightGray.copy(alpha = 0.6f) // 50% opacity for transparency
-            TaskState.STARTED -> Color.Red.copy(alpha = 1.0f) // 50% opacity for transparency
-            TaskState.COMPLETED -> Color.Green.copy(alpha = 1.0f) // 50% opacity for transparency
+            TaskState.DEFAULT -> Color.LightGray.copy(alpha = 0.9f) // 50% opacity for transparency
+            TaskState.STARTED -> Color.Yellow.copy(alpha = 1.0f) // Yellow for started tasks
+            TaskState.COMPLETED -> Color.Green.copy(alpha = 1.0f) // Green for completed tasks
+            TaskState.LATE -> Color.Red.copy(alpha = 1.0f) // Red for late tasks
         }
     }
 
@@ -393,17 +472,37 @@ class MainActivity : ComponentActivity() {
                             task.description.value = description
                             task.time.value = time
                             task.descriptionDetails.value = descriptionDetails
-                            onSave(task)
+
+                            // Get current time in "HHmm" format
+                            val currentTime = SimpleDateFormat("HHmm", Locale.getDefault()).format(Date())
+
+                            // Compare the new task time with the current time and update task state
+                            if (time.toIntOrNull() != null && currentTime.toIntOrNull() != null) {
+                                val taskTime = time.toInt()
+                                val now = currentTime.toInt()
+
+                                if (taskTime > now) {
+                                    task.state.value = TaskState.DEFAULT
+                                } else if (taskTime == now) {
+                                    task.state.value = TaskState.STARTED
+                                } else if (taskTime < now && task.state.value != TaskState.COMPLETED) {
+                                    task.state.value = TaskState.LATE
+                                }
+                            }
+
+                            onSave(task) // Save the task
                         }) {
                             Text("Save")
                         }
-                        Button(onClick = { onCancel() }) {
-                            Text("Cancel")
-                        }
+
                         Button(onClick = {
-                            onDelete() // Handle deletion here
+                            onDelete() // Call the delete function
                         }) {
                             Text("Delete")
+                        }
+
+                        Button(onClick = { onCancel() }) {
+                            Text("Cancel")
                         }
                     }
                 }
@@ -411,7 +510,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Composable function to show mission details in a dialog
     @Composable
     fun MissionDetailsDialog(description: String, onDismiss: () -> Unit) {
         Dialog(onDismissRequest = { onDismiss() }) {
@@ -421,9 +519,9 @@ class MainActivity : ComponentActivity() {
                 shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Mission Details", fontWeight = FontWeight.Bold, fontSize = 30.sp)
+                    Text(text = "Mission Details", fontWeight = FontWeight.Bold, fontSize = 30.sp, color = Color.White) // Changed to white
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = description)
+                    Text(text = description, color = Color.White) // Changed to white
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = { onDismiss() }) {
                         Text("Close")
